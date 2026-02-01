@@ -1,19 +1,21 @@
-# Smart Building Telemetry Streaming Analytics
+# Smart Building Edge Telemetry System
 
-A real-time streaming analytics pipeline for smart building sensor data using MQTT, Redpanda (Kafka), and Apache Spark Streaming with Delta Lake.
+A lightweight, edge-focused real-time telemetry system for smart building sensor data using LF Edge components (NanoMQ, eKuiper), InfluxDB for time-series storage, and Grafana for visualization.
 
 ## 🏗️ Architecture
 
 ```
-Python Sensors (8 rooms) → MQTT Broker → MQTT-Kafka Bridge → Redpanda
-    (0.5s intervals)                                            ↓
-                                                         Spark Streaming
-                                                         (10s windows, 5s slide)
-                                                                ↓
-                                                    ┌───────────┴───────────┐
-                                                    ↓                       ↓
-                                            Delta Lake (MinIO)    Redpanda Downsampled Topics
-                                            Time-travel enabled    (telemetry.room_X.downsampled)
+Python Sensors (8 rooms)
+    ↓ (0.5s = 2Hz per room, 16 msgs/sec total)
+NanoMQ (MQTT Broker)
+    ↓ telemetry/01-08
+eKuiper (Stream Processing)
+    ↓ Downsample (5s windows = 0.2Hz)
+    ├─→ NanoMQ (ds_telemetry/01-08)
+    └─→ InfluxDB (smart_building bucket)
+         ↓
+    Grafana (Visualization)
+         └─ Single dashboard with room selector
 ```
 
 ## 📊 Project Components
@@ -24,44 +26,49 @@ Python Sensors (8 rooms) → MQTT Broker → MQTT-Kafka Bridge → Redpanda
 - **Frequency**: Every 0.5 seconds (2 messages/sec per room = 16 msgs/sec total)
 
 ### 2. Message Transport
-- **MQTT Broker**: Mosquitto for IoT device simulation
-- **Redpanda**: Kafka-compatible streaming platform
-- **Topics**: 
-  - `telemetry.room_1` through `telemetry.room_8` (raw data)
-  - `telemetry.room_1.downsampled` through `telemetry.room_8.downsampled` (aggregated)
-- **Retention**: 3 days
+- **NanoMQ**: Ultra-lightweight MQTT broker from LF Edge
+- **Raw Topics**: `telemetry/01` through `telemetry/08` (one per room)
+- **Downsampled Topics**: `telemetry/ds/01` through `telemetry/ds/08` (processed data)
+- **Protocol**: MQTT on port 1883, WebSocket on port 8083
 
 ### 3. Stream Processing
-- **Spark Streaming**: Structured Streaming with sliding windows
-- **Window Strategy**: 10-second windows sliding every 5 seconds
-- **Operations**: Aggregations (avg, min, max, sum) with room metadata enrichment
-- **Dual Sink**: Delta Lake + Redpanda
+- **eKuiper**: Lightweight edge streaming SQL engine from LF Edge
+- **Downsampling**: Aggregates 2Hz raw data into 0.2Hz streams (5-second windows)
+- **Aggregations**: AVG for metrics, MAX for events
+- **Dual Sinks**: Publishes to both NanoMQ (MQTT) and InfluxDB simultaneously
 
-### 4. Storage & Analytics
-- **Delta Lake**: ACID transactions, time-travel, schema evolution
-- **MinIO**: S3-compatible object storage
-- **SQLite**: Room metadata dimension table
+### 4. Time-Series Storage
+- **InfluxDB**: Purpose-built time-series database
+- **Bucket**: `smart_building`
+- **Retention**: Configurable (default: 30 days)
+- **Data Model**: Tags (room metadata) + Fields (sensor measurements)
+
+### 5. Visualization
+- **Grafana**: Real-time dashboarding and alerting
+- **Dashboard**: Single unified view with room dropdown selector
+- **Metrics**: Temperature, humidity, CO2, light, occupancy, motion, energy, air quality
+- **Data Source**: InfluxDB with Flux queries
 
 ## 🏠 Room Profiles
 
 | Room ID | Name | Characteristics |
 |---------|------|-----------------|
-| room_1 | Server Room | Cool (18-20°C), low humidity, always "occupied", high energy |
-| room_2 | Conference Room | Swinging temp/humidity, burst occupancy, variable energy |
-| room_3 | Storage Closet | Always dark, stable temp, no occupancy, minimal energy |
-| room_4 | Open Office | Moderate temp, consistent occupancy (5-8), moderate energy |
-| room_5 | Kitchen | High humidity spikes, temp spikes, high energy bursts |
-| room_6 | Lab/Workshop | Highly variable everything, air quality issues |
-| room_7 | Break Room | Stable temp, low occupancy, variable lighting |
-| room_8 | Executive Office | Perfectly controlled, single occupancy, consistent |
+| 01 | Server Room | Cool (18-20°C), low humidity, always "occupied", high energy |
+| 02 | Conference Room | Swinging temp/humidity, burst occupancy, variable energy |
+| 03 | Storage Closet | Always dark, stable temp, no occupancy, minimal energy |
+| 04 | Open Office | Moderate temp, consistent occupancy (5-8), moderate energy |
+| 05 | Kitchen | High humidity spikes, temp spikes, high energy bursts |
+| 06 | Lab/Workshop | Highly variable everything, air quality issues |
+| 07 | Break Room | Stable temp, low occupancy, variable lighting |
+| 08 | Executive Office | Perfectly controlled, single occupancy, consistent |
 
 ## 📋 Data Schema
 
 ### Raw Telemetry Message (JSON)
 ```json
 {
-  "room_id": "room_1",
-  "timestamp": "2026-01-30T10:30:45.500Z",
+  "room_id": "01",
+  "timestamp": "2026-01-31T10:30:45.500Z",
   "temperature": 19.2,
   "humidity": 35.5,
   "co2_ppm": 450,
@@ -73,32 +80,19 @@ Python Sensors (8 rooms) → MQTT Broker → MQTT-Kafka Bridge → Redpanda
 }
 ```
 
-### Aggregated Data (Delta Lake)
-```
-window_start, window_end, room_id, room_name, floor, room_type,
-avg_temperature, min_temperature, max_temperature,
-avg_humidity, min_humidity, max_humidity,
-avg_co2, max_co2,
-avg_light,
-max_occupancy,
-motion_events,
-avg_energy,
-avg_air_quality, min_air_quality
-```
-
 ## 🚀 Quick Start
 
 ### Prerequisites
 - Docker & Docker Compose
-- 8GB+ RAM recommended
-- 10GB+ disk space
+- 2GB+ RAM recommended
+- 5GB+ disk space
 
 ### Setup
 
 1. **Clone and navigate to project**
 ```bash
 git clone <repo-url>
-cd smart-building-streaming
+cd smart-building
 ```
 
 2. **Start the stack**
@@ -111,164 +105,198 @@ docker-compose up -d
 docker-compose ps
 ```
 
-All services should be healthy:
-- Redpanda: http://localhost:8080 (Console)
-- Spark Master: http://localhost:8081
-- MinIO: http://localhost:9001 (admin/password)
+All services should be running:
+- NanoMQ: localhost:1883 (MQTT), localhost:8083 (WebSocket)
+- eKuiper: http://localhost:9081 (REST API), http://localhost:20498 (Web UI)
+- InfluxDB: http://localhost:8086 (Web UI & API)
+- Grafana: http://localhost:3000 (Web UI, default: admin/admin)
 
-4. **Initialize room metadata**
-```bash
-docker-compose exec sensor-simulator python init_metadata.py
-```
-
-5. **Start sensor simulation**
-```bash
-docker-compose exec sensor-simulator python sensor_simulator.py
-```
-
-6. **Start MQTT-Kafka bridge**
-```bash
-docker-compose exec mqtt-bridge python bridge.py
-```
-
-7. **Submit Spark streaming job**
-```bash
-docker-compose exec spark-master spark-submit \
-  --master spark://spark-master:7077 \
-  --packages io.delta:delta-core_2.12:2.4.0,org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0 \
-  /app/streaming_app.py
-```
+eKuiper automatically loads from `ekuiper/etc/init.json`:
+- 1 stream definition subscribing to `telemetry/#`
+- 8 downsampling rules (one per room)
+- Rules aggregate 5-second windows and output to `telemetry/ds/01` through `telemetry/ds/08`
 
 ## 📊 Monitoring & Validation
 
-### Check Redpanda Topics
+### Test MQTT Connection
+Using MQTT Explorer or command line:
 ```bash
-docker-compose exec redpanda rpk topic list
-docker-compose exec redpanda rpk topic consume telemetry.room_1 --num 5
+# Subscribe to raw telemetry (2Hz per room)
+mosquitto_sub -h localhost -p 1883 -t "telemetry/01" -v
+
+# Subscribe to downsampled telemetry (0.2Hz per room)
+mosquitto_sub -h localhost -p 1883 -t "telemetry/ds/01" -v
+
+# Subscribe to all downsampled topics
+mosquitto_sub -h localhost -p 1883 -t "telemetry/ds/#" -v
 ```
 
-### Query Delta Lake
-```python
-from pyspark.sql import SparkSession
+Or using Docker:
+```bash
+# Raw data
+docker exec -it smart-building-nanomq nanomq_cli sub -t "telemetry/01" -h localhost
 
-spark = SparkSession.builder \
-    .config("spark.sql.extensions", "io.delta.sql.DeltaSparkSessionExtension") \
-    .config("spark.sql.catalog.spark_catalog", "org.apache.spark.sql.delta.catalog.DeltaCatalog") \
-    .getOrCreate()
-
-df = spark.read.format("delta").load("s3a://datalake/telemetry_5s_agg")
-df.show()
-
-# Time travel
-df_historical = spark.read.format("delta").option("versionAsOf", 0).load("s3a://datalake/telemetry_5s_agg")
+# Downsampled data
+docker exec -it smart-building-nanomq nanomq_cli sub -t "telemetry/ds/01" -h localhost
 ```
 
-### View Downsampled Topics
+### Check eKuiper Streams
 ```bash
-docker-compose exec redpanda rpk topic consume telemetry.room_1.downsampled
+# List streams
+curl http://localhost:9081/streams
+
+# Check rules and their status
+curl http://localhost:9081/rules
+
+# Check specific rule status
+curl http://localhost:9081/rules/downsample_room_01/status
+
+# Access eKuiper web management console
+open http://localhost:20498
 ```
 
-## 🧪 Testing Reprocessing
-
-Stop the Spark job and replay data from 1 hour ago:
-
+### Query EdgeLake
 ```bash
-# Stop current job
-docker-compose exec spark-master <kill process>
-
-# Restart with earlier offset
-# Modify streaming_app.py startingOffsets parameter
-# Or use Kafka consumer groups to reset offset
+# Query data via REST API
+curl -X GET "http://localhost:32048/query?sql=SELECT * FROM telemetry LIMIT 10"
 ```
 
 ## 🐳 Docker Services
 
 | Service | Port(s) | Description |
 |---------|---------|-------------|
-| mosquitto | 1883 | MQTT broker |
-| redpanda | 9092, 8081, 8082 | Kafka-compatible broker |
-| redpanda-console | 8080 | Web UI for Redpanda |
-| spark-master | 7077, 8081 | Spark cluster manager |
-| spark-worker | 8082 | Spark executor |
-| minio | 9000, 9001 | S3-compatible storage |
 | sensor-simulator | - | Python sensor data generator |
-| mqtt-bridge | - | MQTT to Kafka bridge |
+| nanomq | 1883, 8083 | Ultra-lightweight MQTT broker from LF Edge |
+| ekuiper | 9081, 20498 | Edge stream processing SQL engine from LF Edge |
+| edgelake | 32048, 32049 | Distributed data management layer from LF Edge |
 
 ## 📁 Project Structure
 
 ```
-smart-building-streaming/
+smart-building/
 ├── docker-compose.yml
 ├── README.md
 ├── sensor-simulator/
 │   ├── Dockerfile
 │   ├── requirements.txt
 │   ├── sensor_simulator.py
-│   ├── room_profiles.py
-│   └── init_metadata.py
-├── mqtt-bridge/
-│   ├── Dockerfile
-│   ├── requirements.txt
-│   └── bridge.py
-├── spark-app/
-│   ├── Dockerfile
-│   ├── requirements.txt
-│   └── streaming_app.py
-├── data/
-│   └── metadata.db (SQLite)
-└── config/
-    ├── mosquitto.conf
-    └── spark-defaults.conf
+│   └── room_profiles.py
+├── ekuiper/
+│   ├── etc/
+│   │   ├── sources/mqtt.yaml
+│   │   ├── sinks/mqtt.yaml
+│   │   └── init.json
+│   ├── data/
+│   └── log/
+├── config/
+│   └── nanomq.conf
+└── data/
+    └── .gitkeep
 ```
 
-## 🎓 Learning Objectives
+## 🎓 Why LF Edge Stack?
 
-This project demonstrates:
+This project demonstrates edge computing using Linux Foundation Edge components:
 
-1. **Streaming Data Ingestion**: MQTT → Kafka pattern for IoT
-2. **Structured Streaming**: Spark's modern streaming API
-3. **Windowing Operations**: Sliding windows for time-series aggregation
-4. **Stream-Static Joins**: Enriching streams with dimension data
-5. **Dual Sinks**: Writing to both data lake and streaming topics
-6. **Delta Lake Features**: ACID, time-travel, schema evolution
-7. **Reprocessing**: Replaying historical data from Kafka
-8. **Backpressure Handling**: Spark's adaptive query execution
+1. **Open Source**: All LF Edge projects (NanoMQ, eKuiper, EdgeLake)
+2. **Lightweight**: Optimized for edge deployment and resource-constrained devices
+3. **Local Processing**: Stream processing and data management at the edge
+4. **Interoperability**: Standards-based MQTT, SQL, and REST APIs
+5. **Edge-to-Cloud**: Built-in support for edge-cloud data federation
+6. **Resilient**: Operates independently without cloud connectivity
 
-## 🔧 Configuration Tuning
+## 🔧 Configuration
 
 Key parameters to experiment with:
 
-- **Sensor frequency**: Adjust `PUBLISH_INTERVAL` in sensor_simulator.py
-- **Window size**: Modify `.window()` in streaming_app.py
-- **Parallelism**: Change Spark worker count and executor cores
-- **Checkpointing**: Configure checkpoint interval for fault tolerance
-- **Watermarking**: Add `.withWatermark()` for late data handling
+- **Sensor frequency**: Adjust `PUBLISH_INTERVAL` in docker-compose.yml
+- **Downsampling window**: Modify TUMBLINGWINDOW size in `ekuiper/etc/init.json` rules (currently 5 seconds)
+- **Aggregation functions**: Edit SQL queries in `ekuiper/etc/init.json` (AVG, MAX, MIN, etc.)
+- **eKuiper rules**: Add custom processing rules via REST API or web UI
+- **EdgeLake policies**: Configure data retention and sync policies
+
+## 📈 Data Flow & eKuiper Downsampling
+
+### Raw Telemetry
+- **Frequency**: 2 Hz (every 0.5 seconds)
+- **Topics**: `telemetry/01` - `telemetry/08`
+- **Volume**: 16 messages/second total (8 rooms × 2 Hz)
+
+### Downsampled Telemetry
+- **Frequency**: 0.2 Hz (every 5 seconds)
+- **Topics**: `telemetry/ds/01` - `telemetry/ds/08`
+- **Volume**: 1.6 messages/second total (8 rooms × 0.2 Hz)
+- **Reduction**: 90% fewer messages
+- **Aggregations**:
+  - Temperature, humidity, CO2, light, energy, air quality: AVG
+  - Occupancy count, motion detected: MAX (captures any activity)
+  - Timestamp: Latest in window
+
+### eKuiper Management
+
+**View and manage rules:**
+```bash
+# List all rules
+curl http://localhost:9081/rules
+
+# Check specific rule status
+curl http://localhost:9081/rules/downsample_room_01/status
+
+# Delete a rule
+curl -X DELETE http://localhost:9081/rules/downsample_room_01
+
+# View streams
+curl http://localhost:9081/streams
+
+# Web UI for visual management
+open http://localhost:20498
+```
+
+**eKuiper directory structure:**
+- `ekuiper/etc/sources/mqtt.yaml`: MQTT source configuration
+- `ekuiper/etc/sinks/mqtt.yaml`: MQTT sink configuration
+- `ekuiper/etc/init.json`: Stream and rule definitions loaded at startup
+- `ekuiper/data/`: Rule and stream state persistence
+- `ekuiper/log/`: eKuiper logs
 
 ## 📚 Next Steps & Extensions
 
-- [ ] Add Grafana dashboards for real-time visualization
-- [ ] Implement anomaly detection (e.g., temperature spikes)
-- [ ] Add stateful operations (e.g., session windows per occupancy)
-- [ ] Experiment with different aggregation windows (1min, 5min)
-- [ ] Add data quality checks and alerting
-- [ ] Implement exactly-once semantics testing
-- [ ] Add schema evolution scenarios
-- [ ] Test failure recovery and checkpoint restoration
+- [x] Add eKuiper downsampling for data volume reduction
+- [ ] Add eKuiper rules for anomaly detection
+- [ ] Configure EdgeLake data policies and retention
+- [ ] Build dashboard for time-series visualization from EdgeLake
+- [ ] Implement alerting based on sensor thresholds
+- [ ] Test edge-to-cloud synchronization with EdgeLake
+- [ ] Add ML model for predictive maintenance
+- [ ] Add additional aggregation windows (1min, 15min, 1hour)
 
 ## 🐛 Troubleshooting
 
-**Issue**: Spark can't connect to Redpanda
-- Check Redpanda is healthy: `docker-compose logs redpanda`
+**Issue**: Sensor simulator can't connect to NanoMQ
+- Check NanoMQ is running: `docker-compose logs nanomq`
 - Verify network: `docker network ls`
 
-**Issue**: MinIO connection refused
-- Ensure MinIO credentials match in Spark config
-- Check bucket exists: `docker-compose exec minio mc ls local/`
+**Issue**: eKuiper rules not processing data
+- Check if rules are running: `curl http://localhost:9081/rules`
+- Check rule status: `curl http://localhost:9081/rules/downsample_room_01/status`
+- View eKuiper logs: `docker-compose logs ekuiper`
+- Verify stream exists: `curl http://localhost:9081/streams`
 
-**Issue**: No data in Delta Lake
-- Check Spark job logs: `docker-compose logs spark-master`
-- Verify watermark isn't too aggressive
-- Check checkpoint location is writable
+**Issue**: No downsampled data on telemetry/ds/* topics
+- Ensure init_rules.sh was executed
+- Check eKuiper logs: `docker-compose logs ekuiper`
+- Verify raw data is flowing: `mosquitto_sub -h localhost -t "telemetry.#"`
+- Check rule metrics: `curl http://localhost:9081/rules/downsample_room_01/status`
+
+**Issue**: No data in EdgeLake
+- Check eKuiper rules: `curl http://localhost:9081/rules`
+- Verify data flow: `docker-compose logs ekuiper`
+- Check EdgeLake logs: `docker-compose logs edgelake`
+
+**Issue**: High resource usage
+- Adjust sensor publish interval (increase from 0.5s)
+- Reduce eKuiper window sizes
+- Configure EdgeLake data retention policies
 
 ## 📝 License
 
@@ -276,4 +304,4 @@ MIT License - Feel free to use for learning purposes
 
 ## 🙏 Acknowledgments
 
-Built for learning Apache Spark Structured Streaming, Delta Lake, and real-time data pipelines.
+Built for learning edge computing, IoT data pipelines, and the Linux Foundation Edge ecosystem.

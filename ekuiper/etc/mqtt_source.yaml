@@ -1,0 +1,6 @@
+#Global MQTT configurations
+default:
+  qos: 1
+  server: "tcp://nanomq:1883"
+  protocolVersion: "3.1.1"
+  insecureSkipVerify: false

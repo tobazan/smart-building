@@ -1,0 +1,58 @@
+version: '3.8'
+
+services:
+  # MQTT Broker - NanoMQ
+  nanomq:
+    image: emqx/nanomq:latest
+    container_name: smart-building-nanomq
+    ports:
+      - "1883:1883"
+      - "8083:8083"
+    networks:
+      - smart-building
+    restart: unless-stopped
+
+  # Sensor Simulator
+  sensor-simulator:
+    build:
+      context: ./sensor-simulator
+      dockerfile: Dockerfile
+    container_name: smart-building-sensor-simulator
+    environment:
+      - MQTT_BROKER=nanomq
+      - MQTT_PORT=1883
+      - MQTT_TOPIC_PREFIX=telemetry
+      - PUBLISH_INTERVAL=0.5
+    networks:
+      - smart-building
+    depends_on:
+      - nanomq
+    restart: unless-stopped
+
+  # eKuiper - Stream Processing for Downsampling
+  ekuiper:
+    image: lfedge/ekuiper:latest
+    container_name: smart-building-ekuiper
+    ports:
+      - "9081:9081"  # REST API
+      - "20498:20498"  # Management console
+    volumes:
+      - ./ekuiper/etc/init.json:/kuiper/etc/init.json:ro
+      - ./ekuiper/etc/mqtt_source.yaml:/kuiper/etc/mqtt_source.yaml:ro
+      - ekuiper-data:/kuiper/data
+      - ekuiper-log:/kuiper/log
+    environment:
+      - MQTT_BROKER=tcp://nanomq:1883
+    networks:
+      - smart-building
+    depends_on:
+      - nanomq
+    restart: unless-stopped
+
+volumes:
+  ekuiper-data:
+  ekuiper-log:
+
+networks:
+  smart-building:
+    driver: bridge
