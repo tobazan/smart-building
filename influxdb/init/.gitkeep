@@ -1,0 +1,2 @@
+# InfluxDB will auto-initialize based on environment variables in docker-compose.yml
+# This directory is mounted for any future custom initialization scripts

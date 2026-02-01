@@ -1,0 +1,17 @@
+apiVersion: 1
+
+datasources:
+  - name: InfluxDB
+    type: influxdb
+    access: proxy
+    uid: influxdb
+    url: http://influxdb:8086
+    jsonData:
+      version: Flux
+      organization: smart-building
+      defaultBucket: sensor_data
+      tlsSkipVerify: true
+    secureJsonData:
+      token: smart-building-token-2026
+    editable: true
+    isDefault: true

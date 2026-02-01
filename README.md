@@ -1,60 +1,78 @@
 # Smart Building Edge Telemetry System
 
-A lightweight, edge-focused real-time telemetry system for smart building sensor data using LF Edge components (NanoMQ, eKuiper), InfluxDB for time-series storage, and Grafana for visualization.
+A lightweight, edge-focused real-time telemetry system for smart building sensor data using industry-standard open-source components.
 
 ## 🏗️ Architecture
 
 ```
-Python Sensors (8 rooms)
-    ↓ (0.5s = 2Hz per room, 16 msgs/sec total)
+Sensor Simulator (8 rooms @ 2Hz)
+    ↓
 NanoMQ (MQTT Broker)
-    ↓ telemetry/01-08
+    ├─→ Raw topics: telemetry/01-08
+    ↓
 eKuiper (Stream Processing)
-    ↓ Downsample (5s windows = 0.2Hz)
-    ├─→ NanoMQ (ds_telemetry/01-08)
-    └─→ InfluxDB (smart_building bucket)
+    └─→ Downsampled topics: ds_telemetry/01-08 (0.2Hz, 5s windows)
          ↓
-    Grafana (Visualization)
-         └─ Single dashboard with room selector
+    Telegraf (Data Bridge)
+         └─→ InfluxDB (Time-Series Database)
+              ↓
+         Grafana (Visualization)
 ```
 
 ## 📊 Project Components
 
-### 1. Data Generation
-- **8 Unique Room Profiles**: Each room simulates different environmental patterns
+### 1. Sensor Simulator (Python)
+- **8 Unique Room Profiles**: Server room, conference room, storage, office, kitchen, lab, break room, executive office
 - **Metrics**: Temperature, humidity, CO2, light, occupancy, motion, energy, air quality
-- **Frequency**: Every 0.5 seconds (2 messages/sec per room = 16 msgs/sec total)
+- **Publishing Rate**: 0.5s intervals (2 messages/sec per room = 16 msgs/sec total)
+- **Topics**: `telemetry/01` through `telemetry/08`
 
-### 2. Message Transport
-- **NanoMQ**: Ultra-lightweight MQTT broker from LF Edge
-- **Raw Topics**: `telemetry/01` through `telemetry/08` (one per room)
-- **Downsampled Topics**: `telemetry/ds/01` through `telemetry/ds/08` (processed data)
-- **Protocol**: MQTT on port 1883, WebSocket on port 8083
+### 2. NanoMQ (MQTT Broker)
+- **Type**: Ultra-lightweight MQTT broker from LF Edge
+- **Protocol**: MQTT 3.1.1 on port 1883, WebSocket on port 8083
+- **Role**: Message transport layer for sensor data
 
-### 3. Stream Processing
-- **eKuiper**: Lightweight edge streaming SQL engine from LF Edge
-- **Downsampling**: Aggregates 2Hz raw data into 0.2Hz streams (5-second windows)
-- **Aggregations**: AVG for metrics, MAX for events
-- **Dual Sinks**: Publishes to both NanoMQ (MQTT) and InfluxDB simultaneously
+### 3. eKuiper (Stream Processing)
+- **Type**: Lightweight edge streaming SQL engine from LF Edge  
+- **Function**: Real-time downsampling and aggregation
+- **Input**: Raw 2Hz streams from `telemetry/#`
+- **Processing**: 5-second hopping windows (10s window, 5s hop)
+- **Aggregations**: AVG for continuous metrics, MAX for discrete events
+- **Output**: Downsampled 0.2Hz streams to `ds_telemetry/#`
+- **Data Reduction**: 90% (16 msgs/sec → 1.6 msgs/sec)
 
-### 4. Time-Series Storage
-- **InfluxDB**: Purpose-built time-series database
-- **Bucket**: `smart_building`
-- **Retention**: Configurable (default: 30 days)
-- **Data Model**: Tags (room metadata) + Fields (sensor measurements)
+### 4. Telegraf (Data Bridge)
+- **Type**: Plugin-driven data collection agent
+- **Function**: MQTT consumer → InfluxDB writer
+- **Input**: Subscribes to `ds_telemetry/#` topics
+- **Output**: Writes to InfluxDB v2 with proper tags and fields
+- **Benefits**: Production-ready, no custom code needed
 
-### 5. Visualization
-- **Grafana**: Real-time dashboarding and alerting
-- **Dashboard**: Single unified view with room dropdown selector
-- **Metrics**: Temperature, humidity, CO2, light, occupancy, motion, energy, air quality
+### 5. InfluxDB (Time-Series Database)
+- **Version**: InfluxDB 2.7
+- **Organization**: `smart-building`
+- **Bucket**: `sensor_data` (30-day retention)
+- **Data Model**: 
+  - Measurement: `sensor_telemetry`
+  - Tags: `room_id`
+  - Fields: `temperature`, `humidity`, `co2_ppm`, `light_lux`, `occupancy_count`, `motion_detected`, `energy_kwh`, `air_quality_index`
+  - Timestamp: from sensor data
+
+### 6. Grafana (Visualization)
+- **Dashboards**: Single unified dashboard with room selector
+- **Visualizations**:
+  - 6 time-series line charts (temperature, humidity, CO2, light, energy, air quality)
+  - 1 gauge panel (current occupancy)
+  - 1 state timeline (motion detection)
 - **Data Source**: InfluxDB with Flux queries
+- **Auto-refresh**: Every 5 seconds
 
 ## 🏠 Room Profiles
 
 | Room ID | Name | Characteristics |
 |---------|------|-----------------|
 | 01 | Server Room | Cool (18-20°C), low humidity, always "occupied", high energy |
-| 02 | Conference Room | Swinging temp/humidity, burst occupancy, variable energy |
+| 02 | Conference Room | Variable temp/humidity, burst occupancy, variable energy |
 | 03 | Storage Closet | Always dark, stable temp, no occupancy, minimal energy |
 | 04 | Open Office | Moderate temp, consistent occupancy (5-8), moderate energy |
 | 05 | Kitchen | High humidity spikes, temp spikes, high energy bursts |
@@ -68,7 +86,7 @@ eKuiper (Stream Processing)
 ```json
 {
   "room_id": "01",
-  "timestamp": "2026-01-31T10:30:45.500Z",
+  "timestamp": "2026-02-01T10:30:45.500Z",
   "temperature": 19.2,
   "humidity": 35.5,
   "co2_ppm": 450,
@@ -80,6 +98,22 @@ eKuiper (Stream Processing)
 }
 ```
 
+### Downsampled Message (Aggregated over 5 seconds)
+```json
+{
+  "room_id": "01",
+  "timestamp": "2026-02-01T10:30:50.000Z",
+  "temperature": 19.18,
+  "humidity": 35.42,
+  "co2_ppm": 448.5,
+  "light_lux": 0,
+  "occupancy_count": 0,
+  "motion_detected": 0,
+  "energy_kwh": 2.31,
+  "air_quality_index": 94.8
+}
+```
+
 ## 🚀 Quick Start
 
 ### Prerequisites
@@ -87,31 +121,173 @@ eKuiper (Stream Processing)
 - 2GB+ RAM recommended
 - 5GB+ disk space
 
-### Setup
+### Startup
 
-1. **Clone and navigate to project**
-```bash
-git clone <repo-url>
-cd smart-building
-```
-
-2. **Start the stack**
+1. **Start all services**
 ```bash
 docker-compose up -d
 ```
 
-3. **Verify services**
+2. **Verify services are running**
 ```bash
 docker-compose ps
 ```
 
-All services should be running:
-- NanoMQ: localhost:1883 (MQTT), localhost:8083 (WebSocket)
-- eKuiper: http://localhost:9081 (REST API), http://localhost:20498 (Web UI)
-- InfluxDB: http://localhost:8086 (Web UI & API)
-- Grafana: http://localhost:3000 (Web UI, default: admin/admin)
+All services should show as "Up":
+- smart-building-nanomq
+- smart-building-sensor-simulator
+- smart-building-ekuiper
+- smart-building-telegraf
+- smart-building-influxdb
+- smart-building-grafana
 
-eKuiper automatically loads from `ekuiper/etc/init.json`:
+3. **Access the dashboard**
+- Grafana: http://localhost:3000 (admin/admin)
+- InfluxDB UI: http://localhost:8086 (admin/admin123456)
+- eKuiper UI: http://localhost:20498
+
+### Verification
+
+**Check MQTT topics:**
+```bash
+# Install mosquitto-clients if needed
+sudo apt-get install mosquitto-clients
+
+# Subscribe to raw telemetry
+mosquitto_sub -h localhost -t "telemetry/#" -v
+
+# Subscribe to downsampled telemetry
+mosquitto_sub -h localhost -t "ds_telemetry/#" -v
+```
+
+**Check InfluxDB data:**
+```bash
+# View Telegraf logs
+docker logs smart-building-telegraf --tail 50
+
+# Query InfluxDB via CLI
+docker exec -it smart-building-influxdb influx query \
+  'from(bucket:"sensor_data") |> range(start: -5m) |> limit(n:10)'
+```
+
+**Check Grafana dashboard:**
+1. Navigate to http://localhost:3000
+2. Login with admin/admin
+3. Go to Dashboards → Smart Building - Room Telemetry
+4. Select a room from the dropdown
+5. Observe real-time data visualization
+
+## 📁 Project Structure
+
+```
+smart-building/
+├── config/
+│   ├── nanomq.conf          # NanoMQ broker configuration
+│   └── telegraf.conf        # Telegraf MQTT→InfluxDB bridge config
+├── ekuiper/
+│   └── etc/
+│       ├── init.json        # eKuiper streams and rules auto-loaded at startup
+│       └── mqtt_source.yaml # MQTT source configuration
+├── grafana/
+│   └── provisioning/
+│       ├── dashboards/
+│       │   ├── dashboard.yaml              # Dashboard provisioning config
+│       │   └── smart-building-dashboard.json # Pre-built dashboard
+│       └── datasources/
+│           └── influxdb.yaml               # InfluxDB datasource config
+├── influxdb/
+│   └── init/                # InfluxDB initialization scripts (optional)
+├── sensor-simulator/
+│   ├── Dockerfile
+│   ├── requirements.txt
+│   ├── sensor_simulator.py  # Main simulator
+│   └── room_profiles.py     # Room profile definitions
+├── docker-compose.yml       # Service orchestration
+└── README.md
+```
+
+## 🔧 Configuration
+
+### Adjusting Publish Rate
+Edit `docker-compose.yml`:
+```yaml
+environment:
+  - PUBLISH_INTERVAL=0.5  # Change to 1.0 for 1 msg/sec, 0.1 for 10 msg/sec
+```
+
+### Adjusting Downsampling Window
+Edit `ekuiper/etc/init.json` - change `HOPPINGWINDOW(ss, 10, 5)`:
+- First parameter (10): Window size in seconds
+- Second parameter (5): Hop interval in seconds
+
+### Changing Data Retention
+Edit `docker-compose.yml`:
+```yaml
+environment:
+  - DOCKER_INFLUXDB_INIT_RETENTION=30d  # Change to 7d, 90d, etc.
+```
+
+## 🛑 Shutdown
+
+```bash
+# Stop all services
+docker-compose down
+
+# Stop and remove volumes (deletes all data)
+docker-compose down -v
+```
+
+## 📊 Performance Metrics
+
+- **Raw message rate**: 16 messages/second (8 rooms × 2 Hz)
+- **Downsampled rate**: 1.6 messages/second (8 rooms × 0.2 Hz)  
+- **Data reduction**: 90%
+- **Memory footprint**: ~500MB total (all services)
+- **CPU usage**: <5% on modern systems
+
+## 🎯 Use Cases
+
+- **Building automation**: Monitor HVAC, lighting, energy consumption
+- **Occupancy analytics**: Track space utilization patterns
+- **Air quality monitoring**: CO2 and general air quality tracking
+- **Energy optimization**: Identify energy waste and optimization opportunities
+- **Anomaly detection**: Detect unusual patterns in sensor data
+- **Edge computing demonstration**: Showcase edge processing before cloud upload
+
+## 🔍 Troubleshooting
+
+**No data in Grafana:**
+1. Check InfluxDB has data: http://localhost:8086 → Data Explorer
+2. Check Telegraf logs: `docker logs smart-building-telegraf`
+3. Verify MQTT messages: `mosquitto_sub -h localhost -t "ds_telemetry/#"`
+
+**Services not starting:**
+1. Check logs: `docker-compose logs [service-name]`
+2. Verify ports are available: `netstat -tulpn | grep -E "1883|8086|3000"`
+3. Check Docker resources: Ensure sufficient memory/CPU
+
+**eKuiper rules not loading:**
+1. Check syntax: `docker logs smart-building-ekuiper | grep -i error`
+2. Verify MQTT connection: `docker logs smart-building-ekuiper | grep -i mqtt`
+
+## 📚 Technology Stack
+
+| Component | Technology | Purpose |
+|-----------|-----------|---------|
+| MQTT Broker | NanoMQ (LF Edge) | Lightweight message transport |
+| Stream Processing | eKuiper (LF Edge) | Real-time data aggregation |
+| Data Bridge | Telegraf | MQTT to InfluxDB pipeline |
+| Time-Series DB | InfluxDB 2.7 | Persistent storage |
+| Visualization | Grafana | Dashboards and analytics |
+| Sensors | Python | Data generation |
+
+## 📝 License
+
+This is a demonstration project for educational purposes.
+
+## 🤝 Contributing
+
+This is a reference implementation. Feel free to fork and adapt for your needs.
 - 1 stream definition subscribing to `telemetry/#`
 - 8 downsampling rules (one per room)
 - Rules aggregate 5-second windows and output to `telemetry/ds/01` through `telemetry/ds/08`

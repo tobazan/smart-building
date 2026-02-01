@@ -1,16 +1,22 @@
 # Python
 __pycache__/
+*.pyc
+*.pyo
 
-# Data files
-data/metadata.db
-data/mqtt-output/
+# Docker volumes data
+influxdb/data/
+grafana/data/
 
 # Logs
 *.log
 logs/
 
-# eKuiper runtime files
-ekuiper/data/*
-ekuiper/log/*
-!ekuiper/data/.gitkeep
-!ekuiper/log/.gitkeep
+# Environment files
+.env
+.env.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
