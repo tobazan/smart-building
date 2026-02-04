@@ -4,20 +4,7 @@ A lightweight, edge-focused real-time telemetry system for smart building sensor
 
 ## 🏗️ Architecture
 
-```
-Sensor Simulator (8 rooms @ 2Hz)
-    ↓
-NanoMQ (MQTT Broker)
-    ├─→ Raw topics: telemetry/01-08
-    ↓
-eKuiper (Stream Processing)
-    └─→ Downsampled topics: ds_telemetry/01-08 (0.2Hz, 5s windows)
-         ↓
-    Telegraf (Data Bridge)
-         └─→ InfluxDB (Time-Series Database)
-              ↓
-         Grafana (Visualization)
-```
+![Smart Building Architecture](architecture.png)
 
 ## 📊 Project Components
 
@@ -37,7 +24,10 @@ eKuiper (Stream Processing)
 - **Function**: Real-time downsampling and aggregation
 - **Input**: Raw 2Hz streams from `telemetry/#`
 - **Processing**: 5-second hopping windows (10s window, 5s hop)
-- **Aggregations**: AVG for continuous metrics, MAX for discrete events
+- **Aggregations**: 
+  - AVG for continuous metrics (temperature, humidity, CO2, light, energy, air quality)
+  - MAX for discrete counts (occupancy_count)
+  - CASE WHEN for boolean conversion (motion_detected: true/false → 1/0)
 - **Output**: Downsampled 0.2Hz streams to `ds_telemetry/#`
 - **Data Reduction**: 90% (16 msgs/sec → 1.6 msgs/sec)
 
@@ -146,37 +136,6 @@ All services should show as "Up":
 - InfluxDB UI: http://localhost:8086 (admin/admin123456)
 - eKuiper UI: http://localhost:20498
 
-### Verification
-
-**Check MQTT topics:**
-```bash
-# Install mosquitto-clients if needed
-sudo apt-get install mosquitto-clients
-
-# Subscribe to raw telemetry
-mosquitto_sub -h localhost -t "telemetry/#" -v
-
-# Subscribe to downsampled telemetry
-mosquitto_sub -h localhost -t "ds_telemetry/#" -v
-```
-
-**Check InfluxDB data:**
-```bash
-# View Telegraf logs
-docker logs smart-building-telegraf --tail 50
-
-# Query InfluxDB via CLI
-docker exec -it smart-building-influxdb influx query \
-  'from(bucket:"sensor_data") |> range(start: -5m) |> limit(n:10)'
-```
-
-**Check Grafana dashboard:**
-1. Navigate to http://localhost:3000
-2. Login with admin/admin
-3. Go to Dashboards → Smart Building - Room Telemetry
-4. Select a room from the dropdown
-5. Observe real-time data visualization
-
 ## 📁 Project Structure
 
 ```
@@ -184,6 +143,8 @@ smart-building/
 ├── config/
 │   ├── nanomq.conf          # NanoMQ broker configuration
 │   └── telegraf.conf        # Telegraf MQTT→InfluxDB bridge config
+├── data/
+│   └── ekuiper/             # eKuiper file sink outputs (downsampled JSONL files)
 ├── ekuiper/
 │   └── etc/
 │       ├── init.json        # eKuiper streams and rules auto-loaded at startup
@@ -206,37 +167,6 @@ smart-building/
 └── README.md
 ```
 
-## 🔧 Configuration
-
-### Adjusting Publish Rate
-Edit `docker-compose.yml`:
-```yaml
-environment:
-  - PUBLISH_INTERVAL=0.5  # Change to 1.0 for 1 msg/sec, 0.1 for 10 msg/sec
-```
-
-### Adjusting Downsampling Window
-Edit `ekuiper/etc/init.json` - change `HOPPINGWINDOW(ss, 10, 5)`:
-- First parameter (10): Window size in seconds
-- Second parameter (5): Hop interval in seconds
-
-### Changing Data Retention
-Edit `docker-compose.yml`:
-```yaml
-environment:
-  - DOCKER_INFLUXDB_INIT_RETENTION=30d  # Change to 7d, 90d, etc.
-```
-
-## 🛑 Shutdown
-
-```bash
-# Stop all services
-docker-compose down
-
-# Stop and remove volumes (deletes all data)
-docker-compose down -v
-```
-
 ## 📊 Performance Metrics
 
 - **Raw message rate**: 16 messages/second (8 rooms × 2 Hz)
@@ -254,23 +184,7 @@ docker-compose down -v
 - **Anomaly detection**: Detect unusual patterns in sensor data
 - **Edge computing demonstration**: Showcase edge processing before cloud upload
 
-## 🔍 Troubleshooting
-
-**No data in Grafana:**
-1. Check InfluxDB has data: http://localhost:8086 → Data Explorer
-2. Check Telegraf logs: `docker logs smart-building-telegraf`
-3. Verify MQTT messages: `mosquitto_sub -h localhost -t "ds_telemetry/#"`
-
-**Services not starting:**
-1. Check logs: `docker-compose logs [service-name]`
-2. Verify ports are available: `netstat -tulpn | grep -E "1883|8086|3000"`
-3. Check Docker resources: Ensure sufficient memory/CPU
-
-**eKuiper rules not loading:**
-1. Check syntax: `docker logs smart-building-ekuiper | grep -i error`
-2. Verify MQTT connection: `docker logs smart-building-ekuiper | grep -i mqtt`
-
-## 📚 Technology Stack
+# 📚 Technology Stack
 
 | Component | Technology | Purpose |
 |-----------|-----------|---------|
@@ -281,60 +195,21 @@ docker-compose down -v
 | Visualization | Grafana | Dashboards and analytics |
 | Sensors | Python | Data generation |
 
-## 📝 License
+## eKuiper Management
 
-This is a demonstration project for educational purposes.
-
-## 🤝 Contributing
-
-This is a reference implementation. Feel free to fork and adapt for your needs.
-- 1 stream definition subscribing to `telemetry/#`
-- 8 downsampling rules (one per room)
-- Rules aggregate 5-second windows and output to `telemetry/ds/01` through `telemetry/ds/08`
-
-## 📊 Monitoring & Validation
-
-### Test MQTT Connection
-Using MQTT Explorer or command line:
+**View and manage rules:**
 ```bash
-# Subscribe to raw telemetry (2Hz per room)
-mosquitto_sub -h localhost -p 1883 -t "telemetry/01" -v
-
-# Subscribe to downsampled telemetry (0.2Hz per room)
-mosquitto_sub -h localhost -p 1883 -t "telemetry/ds/01" -v
-
-# Subscribe to all downsampled topics
-mosquitto_sub -h localhost -p 1883 -t "telemetry/ds/#" -v
-```
-
-Or using Docker:
-```bash
-# Raw data
-docker exec -it smart-building-nanomq nanomq_cli sub -t "telemetry/01" -h localhost
-
-# Downsampled data
-docker exec -it smart-building-nanomq nanomq_cli sub -t "telemetry/ds/01" -h localhost
-```
-
-### Check eKuiper Streams
-```bash
-# List streams
-curl http://localhost:9081/streams
-
-# Check rules and their status
+# List all rules
 curl http://localhost:9081/rules
 
 # Check specific rule status
 curl http://localhost:9081/rules/downsample_room_01/status
 
-# Access eKuiper web management console
-open http://localhost:20498
-```
+# View streams
+curl http://localhost:9081/streams
 
-### Query EdgeLake
-```bash
-# Query data via REST API
-curl -X GET "http://localhost:32048/query?sql=SELECT * FROM telemetry LIMIT 10"
+# Access web UI for visual management
+open http://localhost:20498
 ```
 
 ## 🐳 Docker Services
@@ -344,52 +219,9 @@ curl -X GET "http://localhost:32048/query?sql=SELECT * FROM telemetry LIMIT 10"
 | sensor-simulator | - | Python sensor data generator |
 | nanomq | 1883, 8083 | Ultra-lightweight MQTT broker from LF Edge |
 | ekuiper | 9081, 20498 | Edge stream processing SQL engine from LF Edge |
-| edgelake | 32048, 32049 | Distributed data management layer from LF Edge |
-
-## 📁 Project Structure
-
-```
-smart-building/
-├── docker-compose.yml
-├── README.md
-├── sensor-simulator/
-│   ├── Dockerfile
-│   ├── requirements.txt
-│   ├── sensor_simulator.py
-│   └── room_profiles.py
-├── ekuiper/
-│   ├── etc/
-│   │   ├── sources/mqtt.yaml
-│   │   ├── sinks/mqtt.yaml
-│   │   └── init.json
-│   ├── data/
-│   └── log/
-├── config/
-│   └── nanomq.conf
-└── data/
-    └── .gitkeep
-```
-
-## 🎓 Why LF Edge Stack?
-
-This project demonstrates edge computing using Linux Foundation Edge components:
-
-1. **Open Source**: All LF Edge projects (NanoMQ, eKuiper, EdgeLake)
-2. **Lightweight**: Optimized for edge deployment and resource-constrained devices
-3. **Local Processing**: Stream processing and data management at the edge
-4. **Interoperability**: Standards-based MQTT, SQL, and REST APIs
-5. **Edge-to-Cloud**: Built-in support for edge-cloud data federation
-6. **Resilient**: Operates independently without cloud connectivity
-
-## 🔧 Configuration
-
-Key parameters to experiment with:
-
-- **Sensor frequency**: Adjust `PUBLISH_INTERVAL` in docker-compose.yml
-- **Downsampling window**: Modify TUMBLINGWINDOW size in `ekuiper/etc/init.json` rules (currently 5 seconds)
-- **Aggregation functions**: Edit SQL queries in `ekuiper/etc/init.json` (AVG, MAX, MIN, etc.)
-- **eKuiper rules**: Add custom processing rules via REST API or web UI
-- **EdgeLake policies**: Configure data retention and sync policies
+| telegraf | - | Data collection agent (MQTT → InfluxDB) |
+| influxdb | 8086 | Time-series database |
+| grafana | 3000 | Visualization and dashboards |
 
 ## 📈 Data Flow & eKuiper Downsampling
 
@@ -400,84 +232,24 @@ Key parameters to experiment with:
 
 ### Downsampled Telemetry
 - **Frequency**: 0.2 Hz (every 5 seconds)
-- **Topics**: `telemetry/ds/01` - `telemetry/ds/08`
+- **Topics**: `ds_telemetry/01` - `ds_telemetry/08`
 - **Volume**: 1.6 messages/second total (8 rooms × 0.2 Hz)
 - **Reduction**: 90% fewer messages
 - **Aggregations**:
   - Temperature, humidity, CO2, light, energy, air quality: AVG
-  - Occupancy count, motion detected: MAX (captures any activity)
+  - Occupancy count: MAX (captures peak activity)
+  - Motion detected: CASE WHEN (converts boolean to 1/0 for InfluxDB)
   - Timestamp: Latest in window
 
-### eKuiper Management
-
-**View and manage rules:**
-```bash
-# List all rules
-curl http://localhost:9081/rules
-
-# Check specific rule status
-curl http://localhost:9081/rules/downsample_room_01/status
-
-# Delete a rule
-curl -X DELETE http://localhost:9081/rules/downsample_room_01
-
-# View streams
-curl http://localhost:9081/streams
-
-# Web UI for visual management
-open http://localhost:20498
-```
-
-**eKuiper directory structure:**
-- `ekuiper/etc/sources/mqtt.yaml`: MQTT source configuration
-- `ekuiper/etc/sinks/mqtt.yaml`: MQTT sink configuration
+### eKuiper Configuration Files
+- `ekuiper/etc/mqtt_source.yaml`: MQTT source configuration
 - `ekuiper/etc/init.json`: Stream and rule definitions loaded at startup
-- `ekuiper/data/`: Rule and stream state persistence
-- `ekuiper/log/`: eKuiper logs
+- `data/ekuiper/`: File sink outputs (downsampled JSONL files)
 
 ## 📚 Next Steps & Extensions
 
-- [x] Add eKuiper downsampling for data volume reduction
-- [ ] Add eKuiper rules for anomaly detection
-- [ ] Configure EdgeLake data policies and retention
-- [ ] Build dashboard for time-series visualization from EdgeLake
+- [ ] Add eKuiper rules for anomaly detection (e.g., high CO2 alerts)
 - [ ] Implement alerting based on sensor thresholds
-- [ ] Test edge-to-cloud synchronization with EdgeLake
-- [ ] Add ML model for predictive maintenance
 - [ ] Add additional aggregation windows (1min, 15min, 1hour)
-
-## 🐛 Troubleshooting
-
-**Issue**: Sensor simulator can't connect to NanoMQ
-- Check NanoMQ is running: `docker-compose logs nanomq`
-- Verify network: `docker network ls`
-
-**Issue**: eKuiper rules not processing data
-- Check if rules are running: `curl http://localhost:9081/rules`
-- Check rule status: `curl http://localhost:9081/rules/downsample_room_01/status`
-- View eKuiper logs: `docker-compose logs ekuiper`
-- Verify stream exists: `curl http://localhost:9081/streams`
-
-**Issue**: No downsampled data on telemetry/ds/* topics
-- Ensure init_rules.sh was executed
-- Check eKuiper logs: `docker-compose logs ekuiper`
-- Verify raw data is flowing: `mosquitto_sub -h localhost -t "telemetry.#"`
-- Check rule metrics: `curl http://localhost:9081/rules/downsample_room_01/status`
-
-**Issue**: No data in EdgeLake
-- Check eKuiper rules: `curl http://localhost:9081/rules`
-- Verify data flow: `docker-compose logs ekuiper`
-- Check EdgeLake logs: `docker-compose logs edgelake`
-
-**Issue**: High resource usage
-- Adjust sensor publish interval (increase from 0.5s)
-- Reduce eKuiper window sizes
-- Configure EdgeLake data retention policies
-
-## 📝 License
-
-MIT License - Feel free to use for learning purposes
-
-## 🙏 Acknowledgments
-
-Built for learning edge computing, IoT data pipelines, and the Linux Foundation Edge ecosystem.
+- [ ] Create custom Avro schemas for sensor data
+- [ ] Add authentication to MQTT broker
