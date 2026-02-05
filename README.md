@@ -4,7 +4,7 @@ A lightweight, edge-focused real-time telemetry system for smart building sensor
 
 ## 🏗️ Architecture
 
-![Smart Building Architecture](architecture.png)
+![Smart Building Architecture](./archit_II.png)
 
 ## 📊 Project Components
 
@@ -28,8 +28,9 @@ A lightweight, edge-focused real-time telemetry system for smart building sensor
   - AVG for continuous metrics (temperature, humidity, CO2, light, energy, air quality)
   - MAX for discrete counts (occupancy_count)
   - CASE WHEN for boolean conversion (motion_detected: true/false → 1/0)
-- **Output**: Downsampled 0.2Hz streams to `ds_telemetry/#`
+- **Output**: Publishes downsampled 0.2Hz streams to `ds_telemetry/#` MQTT topics
 - **Data Reduction**: 90% (16 msgs/sec → 1.6 msgs/sec)
+- **No persistence**: Pure stream processing, no file writing
 
 ### 4. Telegraf (Data Bridge)
 - **Type**: Plugin-driven data collection agent
@@ -38,7 +39,18 @@ A lightweight, edge-focused real-time telemetry system for smart building sensor
 - **Output**: Writes to InfluxDB v2 with proper tags and fields
 - **Benefits**: Production-ready, no custom code needed
 
-### 5. InfluxDB (Time-Series Database)
+### 5. Parquet Golang Bridge
+- **Type**: Custom Golang MQTT consumer and Parquet file writer
+- **Language**: Go 1.21 with parquet-go library
+- **Function**: MQTT consumer → Parquet file writer for long-term storage
+- **Input**: Subscribes to `ds_telemetry/#` topics
+- **Output**: Writes to compressed Parquet files with Snappy compression
+- **File Rotation**: Hourly rotation by default (configurable via `FILE_ROTATION_SEC`)
+- **Storage**: `/data/parquet/` directory
+- **Performance**: Efficient columnar storage, minimal memory footprint
+- **Benefits**: Queryable with DuckDB/Pandas/Spark, optimized for analytics queries
+
+### 6. InfluxDB (Time-Series Database)
 - **Version**: InfluxDB 2.7
 - **Organization**: `smart-building`
 - **Bucket**: `sensor_data` (30-day retention)
@@ -48,7 +60,7 @@ A lightweight, edge-focused real-time telemetry system for smart building sensor
   - Fields: `temperature`, `humidity`, `co2_ppm`, `light_lux`, `occupancy_count`, `motion_detected`, `energy_kwh`, `air_quality_index`
   - Timestamp: from sensor data
 
-### 6. Grafana (Visualization)
+### 7. Grafana (Visualization)
 - **Dashboards**: Single unified dashboard with room selector
 - **Visualizations**:
   - 6 time-series line charts (temperature, humidity, CO2, light, energy, air quality)
@@ -191,6 +203,7 @@ smart-building/
 | MQTT Broker | NanoMQ (LF Edge) | Lightweight message transport |
 | Stream Processing | eKuiper (LF Edge) | Real-time data aggregation |
 | Data Bridge | Telegraf | MQTT to InfluxDB pipeline |
+| File Writer | Parquet Golang Bridge | MQTT to Parquet files |
 | Time-Series DB | InfluxDB 2.7 | Persistent storage |
 | Visualization | Grafana | Dashboards and analytics |
 | Sensors | Python | Data generation |
@@ -220,6 +233,7 @@ open http://localhost:20498
 | nanomq | 1883, 8083 | Ultra-lightweight MQTT broker from LF Edge |
 | ekuiper | 9081, 20498 | Edge stream processing SQL engine from LF Edge |
 | telegraf | - | Data collection agent (MQTT → InfluxDB) |
+| parquet-golang-bridge | - | Golang MQTT consumer → Parquet writer |
 | influxdb | 8086 | Time-series database |
 | grafana | 3000 | Visualization and dashboards |
 
@@ -244,12 +258,17 @@ open http://localhost:20498
 ### eKuiper Configuration Files
 - `ekuiper/etc/mqtt_source.yaml`: MQTT source configuration
 - `ekuiper/etc/init.json`: Stream and rule definitions loaded at startup
-- `data/ekuiper/`: File sink outputs (downsampled JSONL files)
+- Rules configured to publish only to MQTT topics (no file sinks)
+
+### File Details
+- **Compression**: Snappy (fast compression/decompression)
+- **Rotation**: Hourly by default (configurable via `FILE_ROTATION_SEC`)
+- **Format**: Columnar storage optimized for analytical queries
+- **Naming**: `sensor_telemetry_YYYYMMDD_HHMMSS.parquet`
 
 ## 📚 Next Steps & Extensions
 
 - [ ] Add eKuiper rules for anomaly detection (e.g., high CO2 alerts)
 - [ ] Implement alerting based on sensor thresholds
 - [ ] Add additional aggregation windows (1min, 15min, 1hour)
-- [ ] Create custom Avro schemas for sensor data
 - [ ] Add authentication to MQTT broker

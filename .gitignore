@@ -8,12 +8,8 @@ influxdb/data/
 grafana/data/
 
 # Output data files, keep directory structure no files
-data/avro/*
-data/json/*
-data/ekuiper/*
-!data/avro/.gitkeep
-!data/json/.gitkeep
-!data/ekuiper/.gitkeep
+data/parquet/*
+!data/parquet/.gitkeep
 !data/.gitkeep
 
 # Logs
