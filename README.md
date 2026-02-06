@@ -4,7 +4,7 @@ A lightweight, edge-focused real-time telemetry system for smart building sensor
 
 ## 🏗️ Architecture
 
-![Smart Building Architecture](./archit_III.png)
+![Smart Building Architecture](./archit_IV.png)
 
 ## 📊 Project Components
 
@@ -58,8 +58,14 @@ A lightweight, edge-focused real-time telemetry system for smart building sensor
 
 ### 5. Telegraf (Data Bridge)
 - **Type**: Plugin-driven data collection agent
-- **Function**: MQTT consumer → InfluxDB writer
-- **Input**: Subscribes to `ds_telemetry/#` topics
+- **Function**: Multi-purpose data collector:
+  1. MQTT consumer → InfluxDB writer (sensor data)
+  2. HTTP poller → InfluxDB (eKuiper rule metrics)
+  3. Prometheus scraper → InfluxDB (NanoMQ metrics)
+- **Inputs**:
+  - MQTT: Subscribes to `ds_telemetry/#` topics → `sensor_data` bucket
+  - HTTP: Polls eKuiper rules status every 15s → `monitoring_ekuiper` bucket
+  - Prometheus: Scrapes NanoMQ metrics every 15s → `monitoring_nanomq` bucket
 - **Output**: Writes to InfluxDB with proper tags and fields
 - **Benefits**: Production-ready, no custom code needed
 
@@ -74,20 +80,32 @@ A lightweight, edge-focused real-time telemetry system for smart building sensor
 
 ### 7. InfluxDB (Time-Series Database)
 - **Organization**: `smart-building`
-- **Bucket**: `sensor_data` (30-day retention)
-- **Data Model**:
-  - Measurement: `sensor_telemetry`
-  - Tags: `room_id`
-  - Fields: `temperature`, `humidity`, `co2_ppm`, `light_lux`, `occupancy_count`, `motion_detected`, `energy_kwh`, `air_quality_index`
-  - Timestamp: from gateway
+- **Buckets**:
+  1. `sensor_data` (30-day retention) - Room telemetry data
+  2. `monitoring_ekuiper` (7-day retention) - eKuiper rule metrics
+  3. `monitoring_nanomq` (7-day retention) - NanoMQ broker metrics
+- **Data Models**:
+  - **sensor_telemetry**:
+    - Tags: `room_id`
+    - Fields: `temperature`, `humidity`, `co2_ppm`, `light_lux`, `occupancy_count`, `motion_detected`, `energy_kwh`, `air_quality_index`
+  - **ekuiper_rule**:
+    - Tags: `rule_name`, `component`
+    - Fields: `status`, `records_in_total`, `records_out_total`, `exceptions_total`, `process_latency_us`
+  - **nanomq_metrics**:
+    - Tags: `component`
+    - Fields: `connections_count`, `sessions_count`, `topics_count`, `subscribers_count`, `messages_received`, `messages_sent`, `messages_dropped`, `memory_usage`, `cpu_usage`
 
 ### 8. Grafana (Visualization)
-- **Dashboards**: Single unified dashboard with room selector
-- **Visualizations**:
-  - 6 time-series line charts (temperature, humidity, CO2, light, energy, air quality)
-  - 1 gauge panel (current occupancy)
-  - 1 state timeline (motion detection)
-- **Data Source**: InfluxDB with Flux queries
+- **Dashboards**:
+  1. **Smart Building Dashboard** - Room telemetry visualization
+     - Room selector dropdown (filter by room_id)
+     - 6 time-series line charts (temperature, humidity, CO2, light, energy, air quality)
+     - 1 gauge panel (current occupancy)
+     - 1 state timeline (motion detection)
+  2. **Monitoring Dashboard** - System health and performance
+     - **NanoMQ Metrics**: Active connections, sessions, topics, subscribers, message throughput, memory usage, CPU usage
+     - **eKuiper Metrics**: Rule status table, total exceptions, records processed per rule, processing latency
+- **Data Sources**: 3 InfluxDB datasources (sensor_data, monitoring_ekuiper, monitoring_nanomq)
 - **Auto-refresh**: Every 5 seconds
 
 ## 📁 Project Structure
@@ -117,11 +135,13 @@ smart-building/
 │   └── provisioning/
 │       ├── dashboards/
 │       │   ├── dashboard.yaml                  # Dashboard provisioning config
-│       │   └── smart-building-dashboard.json   # Pre-built dashboard
+│       │   ├── smart-building-dashboard.json   # Pre-built sensor dashboard
+│       │   └── monitoring-dashboard.json       # Pre-built monitoring dashboard
 │       └── datasources/
-│           └── influxdb.yaml                   # InfluxDB datasource config
+│           └── influxdb.yaml                   # InfluxDB datasource config (3 buckets)
 ├── influxdb/
-│   └── init/                                   # InfluxDB initialization scripts (optional)
+│   └── init/
+│       └── init-influxdb.sh                    # Bucket creation script (sensor_data, monitoring_ekuiper, monitoring_nanomq)
 ├── sensor-simulator/
 │   ├── Dockerfile
 │   ├── main.py                                 # BACnet/Modbus server implementation
@@ -131,14 +151,20 @@ smart-building/
 └── README.md
 ```
 
-## UI urls
+## 🌐 UI URLs
 
-- Grafana: http://localhost:3000 (admin/admin)
-- InfluxDB UI: http://localhost:8086 (admin/admin123456)
-- eKuiper UI: http://localhost:20498
-   1. List all rules `http://localhost:9081/rules`
-   2. Rules status `http://localhost:9081/rules/downsample_room_01/status`
-   3. List streams `http://localhost:9081/streams`
+- **Grafana**: http://localhost:3000 (admin/admin)
+  - Smart Building Dashboard: Pre-configured sensor visualization
+  - Monitoring Dashboard: NanoMQ and eKuiper health metrics
+- **InfluxDB UI**: http://localhost:8086 (admin/admin123456)
+  - Buckets: sensor_data, monitoring_ekuiper, monitoring_nanomq
+- **eKuiper REST API**: http://localhost:9081
+  - List all rules: `http://localhost:9081/rules`
+  - Rule status: `http://localhost:9081/rules/downsample_room_01/status`
+  - List streams: `http://localhost:9081/streams`
+- **eKuiper Management Console**: http://localhost:20498
+- **NanoMQ HTTP API**: http://localhost:8081
+  - Prometheus metrics: `http://localhost:8081/api/v4/prometheus`
 
 ## 🐳 Docker Services
 
@@ -146,12 +172,12 @@ smart-building/
 |---------|---------|-------------|
 | sensor-simulator | 47808 (BACnet), 5020 (Modbus) | Python BACnet/Modbus protocol servers |
 | golang-gateway | - | Real BACnet/Modbus client with MQTT publisher |
-| nanomq | 1883, 8083 | Ultra-lightweight MQTT broker from LF Edge |
-| ekuiper | 9081, 20498 | Edge stream processing SQL engine from LF Edge |
-| telegraf | - | Data collection agent (MQTT → InfluxDB) |
+| nanomq | 1883, 8083, 8081 | Ultra-lightweight MQTT broker from LF Edge (includes Prometheus metrics endpoint) |
+| ekuiper | 9081, 20498 | Edge stream processing SQL engine from LF Edge (includes REST API for monitoring) |
+| telegraf | - | Data collection agent (sensor data + system monitoring → InfluxDB) |
 | parquet-golang-bridge | - | Golang MQTT consumer → Parquet writer |
-| influxdb | 8086 | Time-series database |
-| grafana | 3000 | Visualization and dashboards |
+| influxdb | 8086 | Time-series database (3 buckets: sensor_data, monitoring_ekuiper, monitoring_nanomq) |
+| grafana | 3000 | Visualization and dashboards (sensor dashboard + monitoring dashboard) |
 
 ## 📈 Data Flow & eKuiper Downsampling
 Protocol Layer (Sensor Simulator)
@@ -192,6 +218,97 @@ Protocol Layer (Sensor Simulator)
 - **Rotation**: Hourly by default (configurable via `FILE_ROTATION_SEC`)
 - **Format**: Columnar storage optimized for analytical queries
 - **Naming**: `sensor_telemetry_YYYYMMDD_HHMMSS.parquet`
+
+---
+
+## 🔬System Monitoring & Observability
+
+The platform includes comprehensive monitoring of the edge stream processing infrastructure to ensure reliability and performance visibility.
+
+### Monitoring Architecture
+
+```
+┌─────────────┐     Prometheus      ┌──────────────┐
+│   NanoMQ    │────────Metrics───────>│              │
+│   Broker    │     (HTTP scrape)    │              │
+└─────────────┘                      │              │
+                                     │   Telegraf   │
+┌─────────────┐     REST API         │   (Collector)│
+│   eKuiper    │─────Status JSON─────>│              │
+│   Engine    │     (HTTP poll)      │              │
+└─────────────┘                      └──────┬───────┘
+                                            │
+                                            v
+                                     ┌─────────────┐
+                                     │  InfluxDB   │
+                                     │             │
+                                     │ • monitoring│
+                                     │   _ekuiper  │
+                                     │ • monitoring│
+                                     │   _nanomq   │
+                                     └──────┬──────┘
+                                            │
+                                            v
+                                     ┌─────────────┐
+                                     │   Grafana   │
+                                     │  Monitoring │
+                                     │  Dashboard  │
+                                     └─────────────┘
+```
+
+### NanoMQ Metrics (MQTT Broker Health)
+
+**Collection Method**: Telegraf scrapes Prometheus-format metrics from NanoMQ HTTP API every 15 seconds
+
+**Metrics Tracked**:
+- **Connections**: Active MQTT client connections (gateway, eKuiper, telegraf, bridge)
+- **Sessions**: Persistent MQTT sessions
+- **Topics**: Number of active topics (`telemetry/#`, `ds_telemetry/#`)
+- **Subscribers**: Active topic subscriptions
+- **Message Throughput**: Messages received/sent/dropped per second (calculated via derivative)
+- **Resource Usage**: Memory usage (current and max), CPU usage percentage
+
+**Use Cases**:
+- Detect broker overload or connection issues
+- Monitor message flow and processing rates
+- Alert on dropped messages indicating capacity problems
+- Track resource consumption for capacity planning
+
+### eKuiper Metrics (Stream Processing Health)
+
+**Collection Method**: Telegraf polls eKuiper REST API for each rule status every 15 seconds
+
+**Metrics Tracked** (per rule):
+- **Rule Status**: running, stopped, or error state
+- **Source Metrics**: Records in/out, processing latency (microseconds), connection status, exceptions
+- **Sink Metrics**: Records in/out, exceptions
+- **Timestamps**: Last start/stop time
+
+**Use Cases**:
+- Verify all 8 downsampling rules are running
+- Detect stream processing failures or disconnections
+- Monitor processing latency to ensure real-time performance
+- Track data loss via exception counters
+- Validate data flow from source (MQTT) to sink (MQTT publish)
+
+### Monitoring Dashboard Features
+
+**NanoMQ Section**:
+- 4 stat panels: Connections, Sessions, Topics, Subscribers (current values)
+- 1 timeseries chart: Message throughput (received/sent/dropped over time)
+- 1 timeseries chart: Memory usage (current and max)
+- 1 timeseries chart: CPU usage percentage
+
+**eKuiper Section**:
+- 1 table panel: Rule status for all 8 downsampling rules (name, status, timestamp)
+- 1 stat panel: Total exceptions across all rules (alert indicator)
+- 1 bar gauge: Records processed per rule (throughput comparison)
+- 1 timeseries chart: Processing latency per rule (performance monitoring)
+
+**Telegraf Configuration**:
+- **Input plugins**: `inputs.mqtt_consumer`, `inputs.http`, `inputs.prometheus`
+- **Output plugins**: `outputs.influxdb_v2` (3 separate outputs with bucket routing via `namepass`)
+- **Processors**: `processors.regex` (extracts rule name from URL for tagging)
 
 ---
 

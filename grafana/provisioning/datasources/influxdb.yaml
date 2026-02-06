@@ -1,10 +1,10 @@
 apiVersion: 1
 
 datasources:
-  - name: InfluxDB
+  - name: InfluxDB - Sensor Data
     type: influxdb
     access: proxy
-    uid: influxdb
+    uid: influxdb-sensors
     url: http://influxdb:8086
     jsonData:
       version: Flux
@@ -15,3 +15,33 @@ datasources:
       token: smart-building-token-2026
     editable: true
     isDefault: true
+
+  - name: InfluxDB - eKuiper Monitoring
+    type: influxdb
+    access: proxy
+    uid: influxdb-ekuiper
+    url: http://influxdb:8086
+    jsonData:
+      version: Flux
+      organization: smart-building
+      defaultBucket: monitoring_ekuiper
+      tlsSkipVerify: true
+    secureJsonData:
+      token: smart-building-token-2026
+    editable: true
+    isDefault: false
+
+  - name: InfluxDB - NanoMQ Monitoring
+    type: influxdb
+    access: proxy
+    uid: influxdb-nanomq
+    url: http://influxdb:8086
+    jsonData:
+      version: Flux
+      organization: smart-building
+      defaultBucket: monitoring_nanomq
+      tlsSkipVerify: true
+    secureJsonData:
+      token: smart-building-token-2026
+    editable: true
+    isDefault: false

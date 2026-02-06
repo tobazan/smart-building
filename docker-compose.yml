@@ -6,8 +6,11 @@ services:
     image: emqx/nanomq:latest
     container_name: smart-building-nanomq
     ports:
-      - "1883:1883"
-      - "8083:8083"
+      - "1883:1883"    # MQTT
+      - "8081:8081"    # HTTP API & Statistics
+      - "8083:8083"    # WebSocket
+    volumes:
+      - ./config/nanomq.conf:/etc/nanomq.conf:ro
     networks:
       - smart-building
     restart: unless-stopped
@@ -86,7 +89,7 @@ services:
     volumes:
       - influxdb-data:/var/lib/influxdb2
       - influxdb-config:/etc/influxdb2
-      - ./influxdb/init:/docker-entrypoint-initdb.d:ro
+      - ./influxdb/init/init-influxdb.sh:/init-influxdb.sh:ro
     environment:
       - DOCKER_INFLUXDB_INIT_MODE=setup
       - DOCKER_INFLUXDB_INIT_USERNAME=admin
