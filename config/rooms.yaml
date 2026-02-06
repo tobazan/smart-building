@@ -1,0 +1,112 @@
+rooms:
+  - id: "01"
+    name: "Conference Room A"
+    floor: 1
+    zone: north
+    sensors:
+      - temp_01
+      - hum_01
+      - co2_01
+      - aqi_01
+      - light_01
+      - energy_01
+      - motion_01
+      - occupancy_01
+      
+  - id: "02"
+    name: "Open Office Space"
+    floor: 1
+    zone: south
+    sensors:
+      - temp_02
+      - hum_02
+      - co2_02
+      - aqi_02
+      - light_02
+      - energy_02
+      - motion_02
+      - occupancy_02
+      
+  - id: "03"
+    name: "Server Room"
+    floor: 2
+    zone: north
+    sensors:
+      - temp_03
+      - hum_03
+      - co2_03
+      - aqi_03
+      - light_03
+      - energy_03
+      - motion_03
+      - occupancy_03
+      
+  - id: "04"
+    name: "Cafeteria"
+    floor: 2
+    zone: south
+    sensors:
+      - temp_04
+      - hum_04
+      - co2_04
+      - aqi_04
+      - light_04
+      - energy_04
+      - motion_04
+      - occupancy_04
+      
+  - id: "05"
+    name: "Executive Suite"
+    floor: 3
+    zone: north
+    sensors:
+      - temp_05
+      - hum_05
+      - co2_05
+      - aqi_05
+      - light_05
+      - energy_05
+      - motion_05
+      - occupancy_05
+      
+  - id: "06"
+    name: "Training Room"
+    floor: 3
+    zone: south
+    sensors:
+      - temp_06
+      - hum_06
+      - co2_06
+      - aqi_06
+      - light_06
+      - energy_06
+      - motion_06
+      - occupancy_06
+      
+  - id: "07"
+    name: "Quiet Study Area"
+    floor: 4
+    zone: north
+    sensors:
+      - temp_07
+      - hum_07
+      - co2_07
+      - aqi_07
+      - light_07
+      - energy_07
+      - motion_07
+      - occupancy_07
+      
+  - id: "08"
+    name: "Lobby & Reception"
+    floor: 1
+    zone: central
+    sensors:
+      - temp_08
+      - hum_08
+      - co2_08
+      - aqi_08
+      - light_08
+      - energy_08
+      - motion_08
+      - occupancy_08
