@@ -6,27 +6,47 @@ services:
     image: emqx/nanomq:latest
     container_name: smart-building-nanomq
     ports:
-      - "1883:1883"
-      - "8083:8083"
+      - "1883:1883"    # MQTT
+      - "8081:8081"    # HTTP API & Statistics
+      - "8083:8083"    # WebSocket
+    volumes:
+      - ./config/nanomq.conf:/etc/nanomq.conf:ro
     networks:
       - smart-building
     restart: unless-stopped
 
-  # Sensor Simulator
+  # Sensor Simulator with BACnet/Modbus servers
   sensor-simulator:
     build:
       context: ./sensor-simulator
       dockerfile: Dockerfile
     container_name: smart-building-sensor-simulator
+    ports:
+      - "47808:47808/udp"  # BACnet
+      - "5020:5020"        # Modbus TCP
+    volumes:
+      - ./config:/app/config:ro
+    networks:
+      - smart-building
+    restart: unless-stopped
+
+  # Golang Gateway - Protocol to MQTT bridge
+  golang-gateway:
+    build:
+      context: ./golang-gateway
+      dockerfile: Dockerfile
+    container_name: smart-building-golang-gateway
     environment:
-      - MQTT_BROKER=nanomq
-      - MQTT_PORT=1883
-      - MQTT_TOPIC_PREFIX=telemetry
-      - PUBLISH_INTERVAL=0.5
+      - MQTT_BROKER=tcp://nanomq:1883
+      - SENSORS_CONFIG=/app/config/sensors.yaml
+      - ROOMS_CONFIG=/app/config/rooms.yaml
+    volumes:
+      - ./config:/app/config:ro
     networks:
       - smart-building
     depends_on:
       - nanomq
+      - sensor-simulator
     restart: unless-stopped
 
   # eKuiper - Stream Processing for Downsampling
@@ -69,7 +89,7 @@ services:
     volumes:
       - influxdb-data:/var/lib/influxdb2
       - influxdb-config:/etc/influxdb2
-      - ./influxdb/init:/docker-entrypoint-initdb.d:ro
+      - ./influxdb/init/init-influxdb.sh:/init-influxdb.sh:ro
     environment:
       - DOCKER_INFLUXDB_INIT_MODE=setup
       - DOCKER_INFLUXDB_INIT_USERNAME=admin

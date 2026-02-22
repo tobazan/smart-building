@@ -1,0 +1,514 @@
+sensors:
+  # BACnet-style sensors (environmental monitoring)
+  - id: temp_01
+    type: temperature
+    protocol: bacnet
+    address: sensor-simulator:47808
+    object_id: 101
+    unit: celsius
+    poll_interval_ms: 500
+    
+  - id: temp_02
+    type: temperature
+    protocol: bacnet
+    address: sensor-simulator:47808
+    object_id: 102
+    unit: celsius
+    poll_interval_ms: 500
+    
+  - id: temp_03
+    type: temperature
+    protocol: bacnet
+    address: sensor-simulator:47808
+    object_id: 103
+    unit: celsius
+    poll_interval_ms: 500
+    
+  - id: temp_04
+    type: temperature
+    protocol: bacnet
+    address: sensor-simulator:47808
+    object_id: 104
+    unit: celsius
+    poll_interval_ms: 500
+    
+  - id: temp_05
+    type: temperature
+    protocol: bacnet
+    address: sensor-simulator:47808
+    object_id: 105
+    unit: celsius
+    poll_interval_ms: 500
+    
+  - id: temp_06
+    type: temperature
+    protocol: bacnet
+    address: sensor-simulator:47808
+    object_id: 106
+    unit: celsius
+    poll_interval_ms: 500
+    
+  - id: temp_07
+    type: temperature
+    protocol: bacnet
+    address: sensor-simulator:47808
+    object_id: 107
+    unit: celsius
+    poll_interval_ms: 500
+    
+  - id: temp_08
+    type: temperature
+    protocol: bacnet
+    address: sensor-simulator:47808
+    object_id: 108
+    unit: celsius
+    poll_interval_ms: 500
+
+  - id: hum_01
+    type: humidity
+    protocol: bacnet
+    address: sensor-simulator:47808
+    object_id: 201
+    unit: percent
+    poll_interval_ms: 500
+    
+  - id: hum_02
+    type: humidity
+    protocol: bacnet
+    address: sensor-simulator:47808
+    object_id: 202
+    unit: percent
+    poll_interval_ms: 500
+    
+  - id: hum_03
+    type: humidity
+    protocol: bacnet
+    address: sensor-simulator:47808
+    object_id: 203
+    unit: percent
+    poll_interval_ms: 500
+    
+  - id: hum_04
+    type: humidity
+    protocol: bacnet
+    address: sensor-simulator:47808
+    object_id: 204
+    unit: percent
+    poll_interval_ms: 500
+    
+  - id: hum_05
+    type: humidity
+    protocol: bacnet
+    address: sensor-simulator:47808
+    object_id: 205
+    unit: percent
+    poll_interval_ms: 500
+    
+  - id: hum_06
+    type: humidity
+    protocol: bacnet
+    address: sensor-simulator:47808
+    object_id: 206
+    unit: percent
+    poll_interval_ms: 500
+    
+  - id: hum_07
+    type: humidity
+    protocol: bacnet
+    address: sensor-simulator:47808
+    object_id: 207
+    unit: percent
+    poll_interval_ms: 500
+    
+  - id: hum_08
+    type: humidity
+    protocol: bacnet
+    address: sensor-simulator:47808
+    object_id: 208
+    unit: percent
+    poll_interval_ms: 500
+
+  - id: co2_01
+    type: co2
+    protocol: bacnet
+    address: sensor-simulator:47808
+    object_id: 301
+    unit: ppm
+    poll_interval_ms: 500
+    
+  - id: co2_02
+    type: co2
+    protocol: bacnet
+    address: sensor-simulator:47808
+    object_id: 302
+    unit: ppm
+    poll_interval_ms: 500
+    
+  - id: co2_03
+    type: co2
+    protocol: bacnet
+    address: sensor-simulator:47808
+    object_id: 303
+    unit: ppm
+    poll_interval_ms: 500
+    
+  - id: co2_04
+    type: co2
+    protocol: bacnet
+    address: sensor-simulator:47808
+    object_id: 304
+    unit: ppm
+    poll_interval_ms: 500
+    
+  - id: co2_05
+    type: co2
+    protocol: bacnet
+    address: sensor-simulator:47808
+    object_id: 305
+    unit: ppm
+    poll_interval_ms: 500
+    
+  - id: co2_06
+    type: co2
+    protocol: bacnet
+    address: sensor-simulator:47808
+    object_id: 306
+    unit: ppm
+    poll_interval_ms: 500
+    
+  - id: co2_07
+    type: co2
+    protocol: bacnet
+    address: sensor-simulator:47808
+    object_id: 307
+    unit: ppm
+    poll_interval_ms: 500
+    
+  - id: co2_08
+    type: co2
+    protocol: bacnet
+    address: sensor-simulator:47808
+    object_id: 308
+    unit: ppm
+    poll_interval_ms: 500
+
+  - id: aqi_01
+    type: air_quality
+    protocol: bacnet
+    address: sensor-simulator:47808
+    object_id: 401
+    unit: index
+    poll_interval_ms: 500
+    
+  - id: aqi_02
+    type: air_quality
+    protocol: bacnet
+    address: sensor-simulator:47808
+    object_id: 402
+    unit: index
+    poll_interval_ms: 500
+    
+  - id: aqi_03
+    type: air_quality
+    protocol: bacnet
+    address: sensor-simulator:47808
+    object_id: 403
+    unit: index
+    poll_interval_ms: 500
+    
+  - id: aqi_04
+    type: air_quality
+    protocol: bacnet
+    address: sensor-simulator:47808
+    object_id: 404
+    unit: index
+    poll_interval_ms: 500
+    
+  - id: aqi_05
+    type: air_quality
+    protocol: bacnet
+    address: sensor-simulator:47808
+    object_id: 405
+    unit: index
+    poll_interval_ms: 500
+    
+  - id: aqi_06
+    type: air_quality
+    protocol: bacnet
+    address: sensor-simulator:47808
+    object_id: 406
+    unit: index
+    poll_interval_ms: 500
+    
+  - id: aqi_07
+    type: air_quality
+    protocol: bacnet
+    address: sensor-simulator:47808
+    object_id: 407
+    unit: index
+    poll_interval_ms: 500
+    
+  - id: aqi_08
+    type: air_quality
+    protocol: bacnet
+    address: sensor-simulator:47808
+    object_id: 408
+    unit: index
+    poll_interval_ms: 500
+
+  # Modbus-style sensors (power and automation)
+  - id: light_01
+    type: light
+    protocol: modbus
+    address: sensor-simulator:5020
+    register: 1
+    unit: lux
+    poll_interval_ms: 500
+    
+  - id: light_02
+    type: light
+    protocol: modbus
+    address: sensor-simulator:5020
+    register: 2
+    unit: lux
+    poll_interval_ms: 500
+    
+  - id: light_03
+    type: light
+    protocol: modbus
+    address: sensor-simulator:5020
+    register: 3
+    unit: lux
+    poll_interval_ms: 500
+    
+  - id: light_04
+    type: light
+    protocol: modbus
+    address: sensor-simulator:5020
+    register: 4
+    unit: lux
+    poll_interval_ms: 500
+    
+  - id: light_05
+    type: light
+    protocol: modbus
+    address: sensor-simulator:5020
+    register: 5
+    unit: lux
+    poll_interval_ms: 500
+    
+  - id: light_06
+    type: light
+    protocol: modbus
+    address: sensor-simulator:5020
+    register: 6
+    unit: lux
+    poll_interval_ms: 500
+    
+  - id: light_07
+    type: light
+    protocol: modbus
+    address: sensor-simulator:5020
+    register: 7
+    unit: lux
+    poll_interval_ms: 500
+    
+  - id: light_08
+    type: light
+    protocol: modbus
+    address: sensor-simulator:5020
+    register: 8
+    unit: lux
+    poll_interval_ms: 500
+
+  - id: energy_01
+    type: energy
+    protocol: modbus
+    address: sensor-simulator:5020
+    register: 101
+    unit: kwh
+    poll_interval_ms: 500
+    
+  - id: energy_02
+    type: energy
+    protocol: modbus
+    address: sensor-simulator:5020
+    register: 102
+    unit: kwh
+    poll_interval_ms: 500
+    
+  - id: energy_03
+    type: energy
+    protocol: modbus
+    address: sensor-simulator:5020
+    register: 103
+    unit: kwh
+    poll_interval_ms: 500
+    
+  - id: energy_04
+    type: energy
+    protocol: modbus
+    address: sensor-simulator:5020
+    register: 104
+    unit: kwh
+    poll_interval_ms: 500
+    
+  - id: energy_05
+    type: energy
+    protocol: modbus
+    address: sensor-simulator:5020
+    register: 105
+    unit: kwh
+    poll_interval_ms: 500
+    
+  - id: energy_06
+    type: energy
+    protocol: modbus
+    address: sensor-simulator:5020
+    register: 106
+    unit: kwh
+    poll_interval_ms: 500
+    
+  - id: energy_07
+    type: energy
+    protocol: modbus
+    address: sensor-simulator:5020
+    register: 107
+    unit: kwh
+    poll_interval_ms: 500
+    
+  - id: energy_08
+    type: energy
+    protocol: modbus
+    address: sensor-simulator:5020
+    register: 108
+    unit: kwh
+    poll_interval_ms: 500
+
+  - id: motion_01
+    type: motion
+    protocol: modbus
+    address: sensor-simulator:5020
+    register: 201
+    unit: boolean
+    poll_interval_ms: 500
+    
+  - id: motion_02
+    type: motion
+    protocol: modbus
+    address: sensor-simulator:5020
+    register: 202
+    unit: boolean
+    poll_interval_ms: 500
+    
+  - id: motion_03
+    type: motion
+    protocol: modbus
+    address: sensor-simulator:5020
+    register: 203
+    unit: boolean
+    poll_interval_ms: 500
+    
+  - id: motion_04
+    type: motion
+    protocol: modbus
+    address: sensor-simulator:5020
+    register: 204
+    unit: boolean
+    poll_interval_ms: 500
+    
+  - id: motion_05
+    type: motion
+    protocol: modbus
+    address: sensor-simulator:5020
+    register: 205
+    unit: boolean
+    poll_interval_ms: 500
+    
+  - id: motion_06
+    type: motion
+    protocol: modbus
+    address: sensor-simulator:5020
+    register: 206
+    unit: boolean
+    poll_interval_ms: 500
+    
+  - id: motion_07
+    type: motion
+    protocol: modbus
+    address: sensor-simulator:5020
+    register: 207
+    unit: boolean
+    poll_interval_ms: 500
+    
+  - id: motion_08
+    type: motion
+    protocol: modbus
+    address: sensor-simulator:5020
+    register: 208
+    unit: boolean
+    poll_interval_ms: 500
+
+  - id: occupancy_01
+    type: occupancy
+    protocol: modbus
+    address: sensor-simulator:5020
+    register: 301
+    unit: count
+    poll_interval_ms: 500
+    
+  - id: occupancy_02
+    type: occupancy
+    protocol: modbus
+    address: sensor-simulator:5020
+    register: 302
+    unit: count
+    poll_interval_ms: 500
+    
+  - id: occupancy_03
+    type: occupancy
+    protocol: modbus
+    address: sensor-simulator:5020
+    register: 303
+    unit: count
+    poll_interval_ms: 500
+    
+  - id: occupancy_04
+    type: occupancy
+    protocol: modbus
+    address: sensor-simulator:5020
+    register: 304
+    unit: count
+    poll_interval_ms: 500
+    
+  - id: occupancy_05
+    type: occupancy
+    protocol: modbus
+    address: sensor-simulator:5020
+    register: 305
+    unit: count
+    poll_interval_ms: 500
+    
+  - id: occupancy_06
+    type: occupancy
+    protocol: modbus
+    address: sensor-simulator:5020
+    register: 306
+    unit: count
+    poll_interval_ms: 500
+    
+  - id: occupancy_07
+    type: occupancy
+    protocol: modbus
+    address: sensor-simulator:5020
+    register: 307
+    unit: count
+    poll_interval_ms: 500
+    
+  - id: occupancy_08
+    type: occupancy
+    protocol: modbus
+    address: sensor-simulator:5020
+    register: 308
+    unit: count
+    poll_interval_ms: 500

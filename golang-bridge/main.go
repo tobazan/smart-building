@@ -20,17 +20,17 @@ import (
 
 // SensorTelemetry represents the downsampled sensor data structure
 type SensorTelemetry struct {
-	RoomID           string  `json:"room_id" parquet:"name=room_id, type=BYTE_ARRAY, convertedtype=UTF8"`
-	Temperature      float64 `json:"temperature" parquet:"name=temperature, type=DOUBLE"`
-	Humidity         float64 `json:"humidity" parquet:"name=humidity, type=DOUBLE"`
-	CO2PPM           float64 `json:"co2_ppm" parquet:"name=co2_ppm, type=DOUBLE"`
-	LightLux         float64 `json:"light_lux" parquet:"name=light_lux, type=DOUBLE"`
-	OccupancyCount   int32   `json:"occupancy_count" parquet:"name=occupancy_count, type=INT32"`
-	MotionDetected   int32   `json:"motion_detected" parquet:"name=motion_detected, type=INT32"`
-	EnergyKWH        float64 `json:"energy_kwh" parquet:"name=energy_kwh, type=DOUBLE"`
-	AirQualityIndex  float64 `json:"air_quality_index" parquet:"name=air_quality_index, type=DOUBLE"`
-	TimestampStr     string  `json:"timestamp"` // RFC3339 string from JSON
-	Timestamp        int64   `json:"-" parquet:"name=timestamp, type=INT64"` // Unix nano for Parquet
+	RoomID          string  `json:"room_id" parquet:"name=room_id, type=BYTE_ARRAY, convertedtype=UTF8"`
+	Temperature     float64 `json:"temperature" parquet:"name=temperature, type=DOUBLE"`
+	Humidity        float64 `json:"humidity" parquet:"name=humidity, type=DOUBLE"`
+	CO2PPM          float64 `json:"co2_ppm" parquet:"name=co2_ppm, type=DOUBLE"`
+	LightLux        float64 `json:"light_lux" parquet:"name=light_lux, type=DOUBLE"`
+	OccupancyCount  int32   `json:"occupancy_count" parquet:"name=occupancy_count, type=INT32"`
+	MotionDetected  bool    `json:"motion_detected" parquet:"name=motion_detected, type=BOOLEAN"`
+	EnergyKWH       float64 `json:"energy_kwh" parquet:"name=energy_kwh, type=DOUBLE"`
+	AirQualityIndex float64 `json:"air_quality_index" parquet:"name=air_quality_index, type=DOUBLE"`
+	TimestampStr    string  `json:"timestamp"`                              // RFC3339 string from JSON
+	Timestamp       int64   `json:"-" parquet:"name=timestamp, type=INT64"` // Unix nano for Parquet
 }
 
 // Config holds application configuration
@@ -258,9 +258,9 @@ var connectLostHandler mqtt.ConnectionLostHandler = func(client mqtt.Client, err
 func (h *MQTTHandler) messageHandler(client mqtt.Client, msg mqtt.Message) {
 	log.Printf("[DEBUG] Received message on topic: %s, payload length: %d", msg.Topic(), len(msg.Payload()))
 	log.Printf("[DEBUG] Payload: %s", string(msg.Payload()))
-	
+
 	var telemetry SensorTelemetry
-	
+
 	if err := json.Unmarshal(msg.Payload(), &telemetry); err != nil {
 		log.Printf("[ERROR] Failed to unmarshal JSON from %s: %v", msg.Topic(), err)
 		h.errorCount++
@@ -276,7 +276,7 @@ func (h *MQTTHandler) messageHandler(client mqtt.Client, msg mqtt.Message) {
 	}
 	telemetry.Timestamp = t.UnixNano()
 
-	log.Printf("[DEBUG] Unmarshaled telemetry: room_id=%s, temp=%.2f, timestamp=%d", 
+	log.Printf("[DEBUG] Unmarshaled telemetry: room_id=%s, temp=%.2f, timestamp=%d",
 		telemetry.RoomID, telemetry.Temperature, telemetry.Timestamp)
 
 	// Write to parquet
@@ -288,8 +288,8 @@ func (h *MQTTHandler) messageHandler(client mqtt.Client, msg mqtt.Message) {
 
 	h.successCount++
 	if h.successCount%100 == 0 {
-		log.Printf("[STATS] Success: %d, Errors: %d, Success rate: %.2f%%", 
-			h.successCount, h.errorCount, 
+		log.Printf("[STATS] Success: %d, Errors: %d, Success rate: %.2f%%",
+			h.successCount, h.errorCount,
 			float64(h.successCount)*100/float64(h.successCount+h.errorCount))
 	}
 	log.Printf("[SUCCESS] Written record for room %s at %d", telemetry.RoomID, telemetry.Timestamp)
@@ -297,7 +297,7 @@ func (h *MQTTHandler) messageHandler(client mqtt.Client, msg mqtt.Message) {
 
 func (h *MQTTHandler) Connect() error {
 	broker := fmt.Sprintf("tcp://%s:%s", h.config.MQTTBroker, h.config.MQTTPort)
-	
+
 	opts := mqtt.NewClientOptions()
 	opts.AddBroker(broker)
 	opts.SetClientID(h.config.MQTTClientID)
@@ -308,7 +308,7 @@ func (h *MQTTHandler) Connect() error {
 	opts.SetCleanSession(true)
 
 	h.client = mqtt.NewClient(opts)
-	
+
 	log.Printf("Connecting to MQTT broker at %s...", broker)
 	if token := h.client.Connect(); token.Wait() && token.Error() != nil {
 		return fmt.Errorf("failed to connect to MQTT broker: %w", token.Error())
@@ -344,28 +344,28 @@ func (h *MQTTHandler) StartPeriodicTasks() {
 
 func (h *MQTTHandler) Close() {
 	log.Println("Closing MQTT handler...")
-	
+
 	if h.client != nil && h.client.IsConnected() {
 		h.client.Disconnect(250)
 	}
-	
+
 	if h.parquetWriter != nil {
 		h.parquetWriter.Close()
 	}
-	
+
 	h.wg.Wait()
 	log.Println("MQTT handler closed")
 }
 
 func main() {
 	log.Println("Starting Parquet Golang Bridge...")
-	
+
 	config := loadConfig()
 	log.Printf("Configuration: Broker=%s:%s, OutputDir=%s, Format=%s",
 		config.MQTTBroker, config.MQTTPort, config.OutputDir, config.OutputFormat)
 
 	handler := NewMQTTHandler(config)
-	
+
 	if err := handler.Connect(); err != nil {
 		log.Fatalf("Failed to connect: %v", err)
 	}
@@ -376,10 +376,10 @@ func main() {
 	// Wait for interrupt signal
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
-	
+
 	log.Println("Parquet Golang Bridge is running. Press Ctrl+C to exit.")
 	<-sigChan
-	
+
 	log.Println("Shutdown signal received...")
 	handler.Close()
 	log.Println("Shutdown complete")
